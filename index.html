@@ -1,0 +1,874 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Invoice & Quote Generator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- html2pdf.js for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #f3f4f6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Custom Scrollbar for Editor */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: #94a3b8;
+            }
+
+        /* A4 Paper Styling for Preview & Print */
+        .a4-page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 20mm;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            position: relative;
+            box-sizing: border-box;
+            color: #374151; /* Gray-700 */
+            /* Ensure the A4 page itself doesn't shrink, we scale its wrapper */
+            flex-shrink: 0;
+        }
+
+        /* Print Specifics */
+        @media print {
+            body {
+                background: white;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            #previewContainer {
+                padding: 0;
+                background: white;
+                display: block;
+                height: auto;
+                overflow: visible;
+            }
+
+            #scaleWrapper {
+                transform: none !important;
+                width: 100%;
+            }
+
+            .a4-page {
+                box-shadow: none;
+                margin: 0;
+                width: 100%;
+                height: auto;
+                padding: 10mm;
+                page-break-after: always;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+
+        /* Form Inputs Customization */
+        .input-group label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #4b5563;
+            font-weight: 600;
+            margin-bottom: 0.375rem;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            background-color: #f9fafb;
+            transition: all 0.2s ease;
+        }
+
+            .form-input:focus {
+                outline: none;
+                border-color: #3b82f6;
+                background-color: #ffffff;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            }
+
+        /* Dynamic Theme Classes */
+        .accent-border {
+            border-color: var(--theme-color, #2563eb) !important;
+        }
+
+        .accent-text {
+            color: var(--theme-color, #2563eb) !important;
+        }
+
+        .accent-bg {
+            background-color: var(--theme-color, #2563eb) !important;
+            color: white !important;
+        }
+
+        .accent-fill {
+            fill: var(--theme-color, #2563eb) !important;
+        }
+
+        /* Smooth fade in */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col md:flex-row overflow-hidden text-gray-800">
+
+    <!-- LEFT PANEL: EDITOR -->
+    <div class="w-full md:w-[450px] lg:w-[500px] h-1/2 md:h-full bg-white border-r border-gray-200 flex flex-col z-20 shadow-xl flex-shrink-0 no-print">
+
+        <!-- Header -->
+        <div class="p-5 border-b border-gray-100 bg-white sticky top-0 z-30 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <div class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                        <i class="fas fa-file-invoice"></i>
+                    </div>
+                    QirGen Pro
+                </h1>
+                <p class="text-xs text-gray-500 mt-1 font-medium">Auto-saves as you type</p>
+            </div>
+            <button onclick="clearAllData()" class="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-md transition font-medium border border-transparent hover:border-red-100">
+                <i class="fas fa-trash-alt mr-1"></i> Reset
+            </button>
+        </div>
+
+        <!-- Scrollable Form -->
+        <div class="p-6 space-y-8 overflow-y-auto flex-grow bg-gray-50/50">
+
+            <!-- Branding Section -->
+            <section class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-palette text-gray-400"></i> Branding & Setup</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label>Document Type</label>
+                        <select id="docType" class="form-input font-medium" onchange="updatePreview()">
+                            <option value="INVOICE">Invoice</option>
+                            <option value="QUOTE">Quote</option>
+                            <option value="ESTIMATE">Estimate</option>
+                            <option value="RECEIPT">Receipt</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Theme Color</label>
+                        <div class="flex items-center gap-3 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
+                            <input type="color" id="themeColor" value="#2563eb" class="h-8 w-10 rounded cursor-pointer border-0 p-0 bg-transparent" oninput="updateTheme()">
+                            <span class="text-sm font-medium text-gray-600 uppercase tracking-wide" id="colorValue">#2563EB</span>
+                        </div>
+                    </div>
+                    <div class="input-group col-span-2">
+                        <label>Company Logo</label>
+                        <div class="flex items-center gap-2">
+                            <input type="file" id="logoInput" accept="image/*" class="form-input text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" onchange="handleLogoUpload(this)">
+                            <button id="removeLogoBtn" onclick="removeLogo()" class="hidden px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition" title="Remove Logo">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sender Info -->
+            <section class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-building text-gray-400"></i> From (Your Company)</h2>
+                <div class="space-y-4">
+                    <div class="input-group">
+                        <label>Company Name</label>
+                        <input type="text" id="senderName" class="form-input" placeholder="e.g. Acme Corp LLC" oninput="updatePreview()">
+                    </div>
+                    <div class="input-group">
+                        <label>Address</label>
+                        <textarea id="senderAddress" rows="2" class="form-input resize-none" placeholder="123 Business Rd, City, Country" oninput="updatePreview()"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>Contact Info</label>
+                        <input type="text" id="senderContact" class="form-input" placeholder="email@example.com | +1 234 567 890" oninput="updatePreview()">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recipient Info -->
+            <section class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-user-tie text-gray-400"></i> To (Client)</h2>
+                <div class="space-y-4">
+                    <div class="input-group">
+                        <label>Client Name / Company</label>
+                        <input type="text" id="clientName" class="form-input" placeholder="e.g. Jane Doe or Wayne Enterprises" oninput="updatePreview()">
+                    </div>
+                    <div class="input-group">
+                        <label>Client Address</label>
+                        <textarea id="clientAddress" rows="2" class="form-input resize-none" placeholder="Client billing address..." oninput="updatePreview()"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Metadata -->
+            <section class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-info-circle text-gray-400"></i> Document Details</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label>Document #</label>
+                        <input type="text" id="docNumber" class="form-input" placeholder="INV-001" oninput="updatePreview()">
+                    </div>
+                    <div class="input-group">
+                        <label>Currency Symbol</label>
+                        <input type="text" id="currencySymbol" value="$" class="form-input" oninput="updatePreview()">
+                    </div>
+                    <div class="input-group">
+                        <label>Issue Date</label>
+                        <input type="date" id="docDate" class="form-input" onchange="updatePreview()">
+                    </div>
+                    <div class="input-group">
+                        <label>Due Date</label>
+                        <input type="date" id="docDueDate" class="form-input" onchange="updatePreview()">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Items -->
+            <section class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-sm font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-list text-gray-400"></i> Line Items</h2>
+                    <button onclick="addItem()" class="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-md hover:bg-gray-800 font-medium transition shadow-sm flex items-center gap-1">
+                        <i class="fas fa-plus"></i> Add Item
+                    </button>
+                </div>
+                <div id="itemsContainer" class="space-y-4">
+                    <!-- Items injected by JS -->
+                </div>
+            </section>
+
+            <!-- Financials -->
+            <section class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-calculator text-gray-400"></i> Taxes & Discounts</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label>Tax Rate (%)</label>
+                        <input type="number" id="taxRate" value="0" min="0" step="0.1" class="form-input" oninput="updatePreview()">
+                    </div>
+                    <div class="input-group">
+                        <label>Discount (%)</label>
+                        <input type="number" id="discountRate" value="0" min="0" max="100" step="0.1" class="form-input" oninput="updatePreview()">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <section class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <h2 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-sticky-note text-gray-400"></i> Notes & Payment Info</h2>
+                <div class="input-group mb-4">
+                    <label>Notes / Terms & Conditions</label>
+                    <textarea id="notes" rows="3" class="form-input resize-none" placeholder="Payment due within 15 days. Thank you for your business." oninput="updatePreview()"></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Bank Details (Optional)</label>
+                    <textarea id="bankDetails" rows="2" class="form-input resize-none" placeholder="Bank: Example Bank&#10;Account: 12345678&#10;Routing: 987654" oninput="updatePreview()"></textarea>
+                </div>
+            </section>
+
+            <!-- Bottom padding for scroll -->
+            <div class="h-4"></div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="p-4 border-t border-gray-200 bg-white sticky bottom-0 z-30 shadow-[0_-4px_15px_-3px_rgba(0,0,0,0.05)]">
+            <button id="downloadBtn" onclick="downloadPDF()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-600/20 transition-all flex justify-center items-center gap-2 text-[15px]">
+                <i class="fas fa-file-pdf"></i> <span id="btnText">Download PDF Document</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: PREVIEW AREA -->
+    <!-- The previewContainer handles overflow and scrolling -->
+    <div id="previewContainer" class="w-full md:flex-1 h-1/2 md:h-full bg-gray-500 overflow-auto p-4 md:p-8 flex justify-center items-start custom-scrollbar relative">
+
+        <!-- Toast Notification (Hidden by default) -->
+        <div id="toast" class="fixed top-6 right-6 bg-gray-900 text-white px-4 py-3 rounded-lg shadow-2xl z-50 transform transition-all duration-300 translate-y-[-150%] opacity-0 flex items-center gap-3">
+            <i class="fas fa-check-circle text-green-400"></i>
+            <span id="toastMsg" class="text-sm font-medium">Action successful</span>
+        </div>
+
+        <!-- The scaleWrapper is what scales up/down via JS based on screen width -->
+        <div id="scaleWrapper" class="transition-transform duration-200 origin-top flex-shrink-0">
+
+            <!-- THE A4 PAGE (Actual PDF Target) -->
+            <div id="invoicePreview" class="a4-page text-sm leading-relaxed">
+
+                <!-- Decorative Top Border -->
+                <div class="absolute top-0 left-0 w-full h-3 accent-bg"></div>
+
+                <div class="px-8 py-4">
+                    <!-- Letterhead / Header -->
+                    <div class="flex justify-between items-start mb-12 mt-4">
+                        <div class="w-7/12 pr-4">
+                            <!-- Logo Placeholder -->
+                            <div id="logoPreviewWrapper" class="mb-6 hidden h-20">
+                                <img id="logoImg" src="" alt="Company Logo" class="h-full w-auto object-contain max-w-[250px]">
+                            </div>
+                            <!-- Sender Details -->
+                            <h1 id="prevSenderName" class="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Your Company LLC</h1>
+                            <div id="prevSenderAddress" class="text-gray-500 whitespace-pre-line leading-snug">123 Business Rd, City, Country</div>
+                            <div id="prevSenderContact" class="text-gray-500 mt-2 font-medium">email@example.com</div>
+                        </div>
+
+                        <div class="w-5/12 text-right">
+                            <h2 id="prevDocType" class="text-4xl font-black accent-text mb-6 uppercase tracking-widest opacity-90">INVOICE</h2>
+                            <div class="inline-block bg-gray-50 rounded-lg p-4 border border-gray-100 shadow-sm">
+                                <table class="w-full text-right">
+                                    <tr>
+                                        <td class="text-gray-500 pr-4 pb-2 text-xs uppercase font-bold tracking-wider">Number</td>
+                                        <td class="font-bold text-gray-900 pb-2" id="prevDocNumber">INV-001</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-gray-500 pr-4 pb-2 text-xs uppercase font-bold tracking-wider">Date</td>
+                                        <td class="font-bold text-gray-900 pb-2" id="prevDocDate">2023-10-27</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-gray-500 pr-4 text-xs uppercase font-bold tracking-wider">Due Date</td>
+                                        <td class="font-bold text-gray-900" id="prevDocDueDate">2023-11-10</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recipient Section -->
+                    <div class="mb-12 flex">
+                        <div class="w-1/2">
+                            <div class="border-l-4 pl-4 accent-border">
+                                <div class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Bill To</div>
+                                <h3 id="prevClientName" class="text-xl font-bold text-gray-900 mb-1.5">Client Name</h3>
+                                <div id="prevClientAddress" class="text-gray-600 whitespace-pre-line leading-snug">Client Address</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Items Table -->
+                    <div class="mb-8 rounded-lg overflow-hidden border border-gray-200">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="accent-bg">
+                                    <th class="py-3 px-4 text-xs uppercase tracking-wider font-bold w-1/2">Description</th>
+                                    <th class="py-3 px-4 text-xs uppercase tracking-wider font-bold text-center w-1/6">Qty</th>
+                                    <th class="py-3 px-4 text-xs uppercase tracking-wider font-bold text-right w-1/6">Price</th>
+                                    <th class="py-3 px-4 text-xs uppercase tracking-wider font-bold text-right w-1/6">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="prevItemsList" class="divide-y divide-gray-200 bg-white">
+                                <!-- Items rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Totals Section -->
+                    <div class="flex justify-end mb-16">
+                        <div class="w-1/2 lg:w-5/12 bg-gray-50 rounded-lg p-5 border border-gray-100">
+                            <div class="flex justify-between py-2 border-b border-gray-200/60">
+                                <span class="text-gray-600 font-medium">Subtotal</span>
+                                <span class="font-bold text-gray-900" id="prevSubtotal">$0.00</span>
+                            </div>
+
+                            <!-- Discount Row (Hidden if 0) -->
+                            <div id="prevDiscountRow" class="flex justify-between py-2 border-b border-gray-200/60 hidden text-red-500">
+                                <span class="font-medium">Discount (<span id="prevDiscountRate">0</span>%)</span>
+                                <span class="font-bold">-<span id="prevDiscountAmount">$0.00</span></span>
+                            </div>
+
+                            <div class="flex justify-between py-2 border-b border-gray-200/60">
+                                <span class="text-gray-600 font-medium">Tax (<span id="prevTaxRate">0</span>%)</span>
+                                <span class="font-bold text-gray-900" id="prevTaxAmount">$0.00</span>
+                            </div>
+
+                            <div class="flex justify-between items-center pt-4 mt-2">
+                                <span class="text-lg font-bold text-gray-900">Total Due</span>
+                                <span class="text-2xl font-black accent-text" id="prevTotal">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Notes (Absolute positioned to bottom of A4) -->
+                <div class="absolute bottom-12 left-8 right-8 px-8">
+                    <div class="border-t-2 border-gray-100 pt-6 flex gap-8">
+                        <div class="flex-1">
+                            <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><i class="fas fa-info-circle"></i> Notes & Terms</h4>
+                            <p id="prevNotes" class="text-xs text-gray-600 leading-relaxed whitespace-pre-line">Payment due within 15 days. Thank you for your business.</p>
+                        </div>
+
+                        <div id="bankDetailsSection" class="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200 hidden">
+                            <h4 class="text-[11px] font-bold text-gray-800 uppercase tracking-widest mb-2 flex items-center gap-1.5"><i class="fas fa-university text-gray-400"></i> Payment Details</h4>
+                            <p id="prevBankDetails" class="text-xs text-gray-600 leading-relaxed whitespace-pre-line font-mono"></p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- State Management ---
+        let items = [
+            { id: Date.now(), desc: "Web Development Services", qty: 1, price: 500 },
+            { id: Date.now() + 1, desc: "Hosting Setup", qty: 1, price: 100 }
+        ];
+
+        // Format numbers to currency style (e.g., 1,234.56)
+        const formatMoney = (amount) => {
+            return parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        // --- Initialization & Local Storage ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Setup resize listener for responsive preview
+            window.addEventListener('resize', scalePreview);
+
+            // Try to load saved data, otherwise set defaults
+            if (!loadData()) {
+                setDefaultDates();
+                const defaultTerms = "1. Quote valid for 30 days from date of issue.\n2. 50% deposit required to commence work.\n3. Goods remain the property of the company until paid in full.\n4. E&OE (Errors and Omissions Excepted).";
+                document.getElementById('notes').value = defaultTerms;
+            }
+
+            renderEditorItems();
+            updatePreview();
+            scalePreview(); // Initial scale calculation
+        });
+
+        function setDefaultDates() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('docDate').value = today;
+            const due = new Date();
+            due.setDate(due.getDate() + 15);
+            document.getElementById('docDueDate').value = due.toISOString().split('T')[0];
+        }
+
+        // --- Responsive Preview Scaling ---
+        function scalePreview() {
+            const container = document.getElementById('previewContainer');
+            const wrapper = document.getElementById('scaleWrapper');
+            // A4 width is 210mm. At 96dpi, that's roughly 794px. We add a little margin.
+            const targetWidth = 820;
+            const availableWidth = container.clientWidth;
+
+            if (availableWidth < targetWidth) {
+                // Scale down based on available width
+                const scale = availableWidth / targetWidth;
+                wrapper.style.transform = `scale(${scale})`;
+                // Adjust height of container so it doesn't leave huge blank space at bottom
+                // 1123 is roughly A4 height in pixels
+                wrapper.style.marginBottom = `-${1123 * (1 - scale)}px`;
+            } else {
+                // Reset scale on large screens
+                wrapper.style.transform = `scale(1)`;
+                wrapper.style.marginBottom = '0px';
+            }
+        }
+
+        // --- Local Storage Functions ---
+        function saveData() {
+            const data = {
+                docType: document.getElementById('docType').value,
+                themeColor: document.getElementById('themeColor').value,
+                senderName: document.getElementById('senderName').value,
+                senderAddress: document.getElementById('senderAddress').value,
+                senderContact: document.getElementById('senderContact').value,
+                clientName: document.getElementById('clientName').value,
+                clientAddress: document.getElementById('clientAddress').value,
+                docNumber: document.getElementById('docNumber').value,
+                currencySymbol: document.getElementById('currencySymbol').value,
+                docDate: document.getElementById('docDate').value,
+                docDueDate: document.getElementById('docDueDate').value,
+                taxRate: document.getElementById('taxRate').value,
+                discountRate: document.getElementById('discountRate').value,
+                notes: document.getElementById('notes').value,
+                bankDetails: document.getElementById('bankDetails').value,
+                items: items
+            };
+
+            const logoImgSrc = document.getElementById('logoImg').src;
+            if (logoImgSrc && logoImgSrc.startsWith('data:image')) {
+                data.logo = logoImgSrc;
+            }
+
+            localStorage.setItem('qirgen_data', JSON.stringify(data));
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('qirgen_data');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+
+                    // Populate basic fields
+                    const fields = ['docType', 'themeColor', 'senderName', 'senderAddress', 'senderContact',
+                        'clientName', 'clientAddress', 'docNumber', 'currencySymbol', 'docDate',
+                        'docDueDate', 'taxRate', 'discountRate', 'notes', 'bankDetails'];
+
+                    fields.forEach(field => {
+                        if (data[field] !== undefined) {
+                            document.getElementById(field).value = data[field];
+                        }
+                    });
+
+                    // Restore Items
+                    if (data.items && Array.isArray(data.items)) {
+                        items = data.items;
+                    }
+
+                    // Restore Logo
+                    if (data.logo) {
+                        document.getElementById('logoImg').src = data.logo;
+                        document.getElementById('logoPreviewWrapper').classList.remove('hidden');
+                        document.getElementById('removeLogoBtn').classList.remove('hidden');
+                    }
+
+                    // Re-apply theme color
+                    updateTheme(false);
+                    return true;
+                } catch (e) {
+                    console.error("Error loading saved data", e);
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        function clearAllData() {
+            if (confirm("Are you sure you want to clear all data and start fresh?")) {
+                localStorage.removeItem('qirgen_data');
+                location.reload();
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.classList.remove('translate-y-[-150%]', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-[-150%]', 'opacity-0');
+            }, 3000);
+        }
+
+        // --- Theme Engine ---
+        function updateTheme(triggerPreview = true) {
+            const color = document.getElementById('themeColor').value;
+            document.documentElement.style.setProperty('--theme-color', color);
+            document.getElementById('colorValue').textContent = color.toUpperCase();
+            if (triggerPreview) updatePreview();
+        }
+
+        // --- Logo Handler ---
+        function handleLogoUpload(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('logoImg').src = e.target.result;
+                    document.getElementById('logoPreviewWrapper').classList.remove('hidden');
+                    document.getElementById('removeLogoBtn').classList.remove('hidden');
+                    updatePreview();
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function removeLogo() {
+            document.getElementById('logoImg').src = "";
+            document.getElementById('logoInput').value = "";
+            document.getElementById('logoPreviewWrapper').classList.add('hidden');
+            document.getElementById('removeLogoBtn').classList.add('hidden');
+            updatePreview();
+        }
+
+        // --- Item Management ---
+        function addItem() {
+            const id = Date.now();
+            items.push({ id, desc: "", qty: 1, price: 0 });
+            renderEditorItems();
+            updatePreview();
+        }
+
+        function removeItem(id) {
+            items = items.filter(i => i.id !== id);
+            renderEditorItems();
+            updatePreview();
+        }
+
+        function changeQty(id, delta) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                const newQty = parseFloat(item.qty) + delta;
+                if (newQty >= 0) {
+                    item.qty = newQty;
+                    // Only update specific input to prevent losing focus
+                    document.getElementById(`qty-${id}`).value = newQty;
+                    updatePreview();
+                }
+            }
+        }
+
+        function updateItemData(id, field, value) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                item[field] = field === 'desc' ? value : parseFloat(value) || 0;
+                updatePreview();
+            }
+        }
+
+        function renderEditorItems() {
+            const container = document.getElementById('itemsContainer');
+            container.innerHTML = '';
+
+            items.forEach((item, index) => {
+                const row = document.createElement('div');
+                row.className = 'bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative mb-4 fade-in group';
+                row.innerHTML = `
+                        <div class="flex justify-between items-start mb-3">
+                             <input type="text" placeholder="Item description (e.g. Web Design)" value="${item.desc.replace(/"/g, '&quot;')}"
+                                    class="w-full bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-sm font-semibold text-gray-800 placeholder-gray-400 pb-1 transition-colors"
+                                    oninput="updateItemData(${item.id}, 'desc', this.value)">
+                             <button onclick="removeItem(${item.id})" class="text-gray-300 hover:text-red-500 hover:bg-red-50 rounded p-1.5 transition-all ml-3 opacity-0 group-hover:opacity-100 focus:opacity-100" title="Remove Item">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-12 gap-4 items-end">
+                            <div class="col-span-5 md:col-span-4">
+                                <label class="text-[10px] text-gray-500 uppercase font-bold mb-1.5 block">Quantity</label>
+                                <div class="flex items-center border border-gray-300 rounded-lg bg-gray-50 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
+                                    <button onclick="changeQty(${item.id}, -1)" class="px-3 py-2 text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition">
+                                        <i class="fas fa-minus text-[10px]"></i>
+                                    </button>
+                                    <input type="number" id="qty-${item.id}" min="0" value="${item.qty}"
+                                        class="w-full text-center py-2 bg-transparent text-sm outline-none appearance-none font-bold text-gray-700"
+                                        oninput="updateItemData(${item.id}, 'qty', this.value)">
+                                    <button onclick="changeQty(${item.id}, 1)" class="px-3 py-2 text-gray-500 hover:bg-gray-200 hover:text-gray-800 transition">
+                                        <i class="fas fa-plus text-[10px]"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="col-span-4 md:col-span-5">
+                                <label class="text-[10px] text-gray-500 uppercase font-bold mb-1.5 block">Unit Price</label>
+                                <div class="relative">
+                                    <input type="number" min="0" step="0.01" value="${item.price}"
+                                        class="form-input text-sm font-bold text-gray-700 !py-2"
+                                        oninput="updateItemData(${item.id}, 'price', this.value)">
+                                </div>
+                            </div>
+
+                            <div class="col-span-3 md:col-span-3 text-right flex flex-col justify-end h-full pb-2">
+                                 <span class="text-[10px] text-gray-400 uppercase font-bold block mb-1">Total</span>
+                                 <span class="text-sm font-black text-blue-600 total-display-${item.id}">
+                                    ${formatMoney(item.qty * item.price)}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                container.appendChild(row);
+            });
+        }
+
+        // --- Core Preview Logic ---
+        function updatePreview() {
+            // Get Values
+            const currency = document.getElementById('currencySymbol').value || '$';
+
+            // Populate basic text
+            const textMappings = {
+                'prevDocType': { id: 'docType', fallback: 'INVOICE' },
+                'prevSenderName': { id: 'senderName', fallback: 'Your Company LLC' },
+                'prevSenderAddress': { id: 'senderAddress', fallback: '123 Business Rd, City, Country' },
+                'prevSenderContact': { id: 'senderContact', fallback: 'email@example.com' },
+                'prevClientName': { id: 'clientName', fallback: 'Client Name' },
+                'prevClientAddress': { id: 'clientAddress', fallback: 'Client Address' },
+                'prevDocNumber': { id: 'docNumber', fallback: '00000' },
+                'prevDocDate': { id: 'docDate', fallback: '-' },
+                'prevDocDueDate': { id: 'docDueDate', fallback: '-' },
+                'prevNotes': { id: 'notes', fallback: ' ' }
+            };
+
+            for (const [prevId, source] of Object.entries(textMappings)) {
+                document.getElementById(prevId).textContent = document.getElementById(source.id).value || source.fallback;
+            }
+
+            // Bank details toggle
+            const bankDetails = document.getElementById('bankDetails').value;
+            const bankDiv = document.getElementById('bankDetailsSection');
+            if (bankDetails.trim()) {
+                bankDiv.classList.remove('hidden');
+                document.getElementById('prevBankDetails').textContent = bankDetails;
+            } else {
+                bankDiv.classList.add('hidden');
+            }
+
+            // Render Items List & Calc Totals
+            const tbody = document.getElementById('prevItemsList');
+            tbody.innerHTML = '';
+            let subtotal = 0;
+
+            items.forEach((item, index) => {
+                const rowTotal = item.qty * item.price;
+                subtotal += rowTotal;
+
+                // Update editor individual total displays
+                const editorTotal = document.querySelector(`.total-display-${item.id}`);
+                if (editorTotal) editorTotal.textContent = currency + formatMoney(rowTotal);
+
+                const tr = document.createElement('tr');
+                // Subtle zebra striping
+                if (index % 2 !== 0) tr.classList.add('bg-gray-50/50');
+
+                tr.innerHTML = `
+                        <td class="py-3.5 px-4 text-gray-800 font-medium">${item.desc || '<span class="text-gray-400 italic">Item description...</span>'}</td>
+                        <td class="py-3.5 px-4 text-gray-700 text-center">${item.qty}</td>
+                        <td class="py-3.5 px-4 text-gray-700 text-right">${currency}${formatMoney(item.price)}</td>
+                        <td class="py-3.5 px-4 text-gray-900 font-bold text-right">${currency}${formatMoney(rowTotal)}</td>
+                    `;
+                tbody.appendChild(tr);
+            });
+
+            // Final Calculations
+            const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+            const discountRate = parseFloat(document.getElementById('discountRate').value) || 0;
+
+            const discountAmount = subtotal * (discountRate / 100);
+            const afterDiscount = subtotal - discountAmount;
+            const taxAmount = afterDiscount * (taxRate / 100);
+            const total = afterDiscount + taxAmount;
+
+            // Update Total Displays
+            document.getElementById('prevSubtotal').textContent = currency + formatMoney(subtotal);
+
+            // Discount Row
+            const discountRow = document.getElementById('prevDiscountRow');
+            if (discountRate > 0) {
+                discountRow.classList.remove('hidden');
+                document.getElementById('prevDiscountRate').textContent = discountRate;
+                document.getElementById('prevDiscountAmount').textContent = currency + formatMoney(discountAmount);
+            } else {
+                discountRow.classList.add('hidden');
+            }
+
+            // Tax and Total
+            document.getElementById('prevTaxRate').textContent = taxRate;
+            document.getElementById('prevTaxAmount').textContent = currency + formatMoney(taxAmount);
+            document.getElementById('prevTotal').textContent = currency + formatMoney(total);
+
+            // Background Auto-Save
+            saveData();
+        }
+
+        // --- PDF DOWNLOAD FUNCTION ---
+        function downloadPDF() {
+            // Ensure preview scale doesn't mess with pdf generation dimensions
+            const wrapper = document.getElementById('scaleWrapper');
+            const originalTransform = wrapper.style.transform;
+            wrapper.style.transform = 'scale(1)';
+
+            const element = document.getElementById('invoicePreview');
+            const btn = document.getElementById('downloadBtn');
+            const btnText = document.getElementById('btnText');
+            const originalText = btnText.innerHTML;
+
+            // Loading state
+            btnText.innerHTML = "Generating Document... <i class='fas fa-spinner fa-spin ml-1'></i>";
+            btn.classList.add('opacity-80', 'cursor-wait');
+
+            // Filename
+            const type = document.getElementById('docType').value;
+            const num = document.getElementById('docNumber').value || '001';
+            const client = document.getElementById('clientName').value.split(' ')[0] || 'Client';
+            const filename = `${type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()}_${num}_${client}.pdf`;
+
+            // Config options
+            const opt = {
+                margin: 0,
+                filename: filename,
+                image: { type: 'jpeg', quality: 1 },
+                html2canvas: { scale: 2, useCORS: true, logging: false },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Execute
+            html2pdf().from(element).set(opt).save().then(() => {
+                // Restore UI
+                btnText.innerHTML = "Document Saved!";
+                btn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+
+                showToast(`Saved as ${filename}`);
+
+                setTimeout(() => {
+                    btnText.innerHTML = originalText;
+                    btn.classList.remove('opacity-80', 'cursor-wait', 'bg-green-600', 'hover:bg-green-700');
+                    btn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                }, 3000);
+
+                // Restore scale
+                wrapper.style.transform = originalTransform;
+            }).catch(err => {
+                console.error(err);
+                alert("Error generating PDF. Check console for details.");
+                btnText.innerHTML = originalText;
+                btn.classList.remove('opacity-80', 'cursor-wait');
+                wrapper.style.transform = originalTransform;
+            });
+        }
+    </script>
+</body>
+</html>
