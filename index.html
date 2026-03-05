@@ -51,7 +51,7 @@
         .a4-page {
             width: 210mm;
             min-height: 297mm;
-            padding: 20mm;
+            /* Remove fixed padding so flex layout can manage it dynamically for page breaks */
             margin: 0 auto;
             background: white;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
@@ -60,6 +60,14 @@
             color: #374151; /* Gray-700 */
             /* Ensure the A4 page itself doesn't shrink, we scale its wrapper */
             flex-shrink: 0; 
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Prevent page breaks inside critical elements */
+        .avoid-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
         }
 
         /* Print Specifics */
@@ -313,11 +321,11 @@
             <div id="invoicePreview" class="a4-page text-sm leading-relaxed">
                 
                 <!-- Decorative Top Border -->
-                <div class="absolute top-0 left-0 w-full h-3 accent-bg"></div>
+                <div class="w-full h-3 accent-bg flex-shrink-0"></div>
 
-                <div class="px-8 py-4">
+                <div class="px-10 py-8 flex-grow flex flex-col w-full">
                     <!-- Letterhead / Header -->
-                    <div class="flex justify-between items-start mb-12 mt-4">
+                    <div class="flex justify-between items-start mb-12 mt-2 avoid-break">
                         <div class="w-7/12 pr-4">
                             <!-- Logo Placeholder -->
                             <div id="logoPreviewWrapper" class="mb-6 hidden h-20">
@@ -331,29 +339,25 @@
 
                         <div class="w-5/12 text-right">
                             <h2 id="prevDocType" class="text-4xl font-black accent-text mb-6 uppercase tracking-widest opacity-90">INVOICE</h2>
-                            <div class="bg-gray-50 rounded-lg p-4 border border-gray-100 shadow-sm block w-full">
-                                <table class="w-full text-right border-collapse">
-                                    <tbody>
-                                        <tr>
-                                            <td class="text-gray-500 pr-4 pb-2 text-xs uppercase font-bold tracking-wider">Number</td>
-                                            <td class="font-bold text-gray-900 pb-2" id="prevDocNumber">INV-001</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-gray-500 pr-4 pb-2 text-xs uppercase font-bold tracking-wider">Date</td>
-                                            <td class="font-bold text-gray-900 pb-2" id="prevDocDate">2023-10-27</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="text-gray-500 pr-4 text-xs uppercase font-bold tracking-wider">Due Date</td>
-                                            <td class="font-bold text-gray-900" id="prevDocDueDate">2023-11-10</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                            <div class="bg-gray-50 rounded-lg p-5 border border-gray-100 shadow-sm flex flex-col gap-3 w-full">
+                                <div class="flex justify-between items-center w-full">
+                                    <span class="text-gray-500 text-xs uppercase font-bold tracking-wider">Number</span>
+                                    <span class="font-bold text-gray-900" id="prevDocNumber">INV-001</span>
+                                </div>
+                                <div class="flex justify-between items-center w-full">
+                                    <span class="text-gray-500 text-xs uppercase font-bold tracking-wider">Date</span>
+                                    <span class="font-bold text-gray-900" id="prevDocDate">2023-10-27</span>
+                                </div>
+                                <div class="flex justify-between items-center w-full">
+                                    <span class="text-gray-500 text-xs uppercase font-bold tracking-wider">Due Date</span>
+                                    <span class="font-bold text-gray-900" id="prevDocDueDate">2023-11-10</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Recipient Section -->
-                    <div class="mb-12 flex">
+                    <div class="mb-12 flex avoid-break">
                         <div class="w-1/2">
                             <div class="border-l-4 pl-4 accent-border">
                                 <div class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Bill To</div>
@@ -367,7 +371,7 @@
                     <div class="mb-8 rounded-lg overflow-hidden border border-gray-200">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="accent-bg">
+                                <tr class="accent-bg avoid-break">
                                     <th class="py-3 px-4 text-xs uppercase tracking-wider font-bold w-1/2">Description</th>
                                     <th class="py-3 px-4 text-xs uppercase tracking-wider font-bold text-center w-1/6">Qty</th>
                                     <th class="py-3 px-4 text-xs uppercase tracking-wider font-bold text-right w-1/6">Price</th>
@@ -381,7 +385,7 @@
                     </div>
 
                     <!-- Totals Section -->
-                    <div class="flex justify-end mb-16">
+                    <div class="flex justify-end mb-16 avoid-break">
                         <div class="w-1/2 lg:w-5/12 bg-gray-50 rounded-lg p-5 border border-gray-100">
                             <div class="flex justify-between py-2 border-b border-gray-200/60">
                                 <span class="text-gray-600 font-medium">Subtotal</span>
@@ -405,19 +409,22 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                    
+                    <!-- Footer Spacer to push content naturally -->
+                    <div class="flex-grow"></div>
 
-                <!-- Footer Notes (Absolute positioned to bottom of A4) -->
-                <div class="absolute bottom-12 left-8 right-8 px-8">
-                    <div class="border-t-2 border-gray-100 pt-6 flex gap-8">
-                        <div class="flex-1">
-                            <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><i class="fas fa-info-circle"></i> Notes & Terms</h4>
-                            <p id="prevNotes" class="text-xs text-gray-600 leading-relaxed whitespace-pre-line">Payment due within 15 days. Thank you for your business.</p>
-                        </div>
+                    <!-- Footer Notes (Now in document flow to prevent cutoff) -->
+                    <div class="w-full mt-auto avoid-break pt-4 pb-4">
+                        <div class="border-t-2 border-gray-100 pt-6 flex gap-8">
+                            <div class="flex-1">
+                                <h4 class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><i class="fas fa-info-circle"></i> Notes & Terms</h4>
+                                <p id="prevNotes" class="text-xs text-gray-600 leading-relaxed whitespace-pre-line">Payment due within 15 days. Thank you for your business.</p>
+                            </div>
 
-                        <div id="bankDetailsSection" class="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200 hidden">
-                            <h4 class="text-[11px] font-bold text-gray-800 uppercase tracking-widest mb-2 flex items-center gap-1.5"><i class="fas fa-university text-gray-400"></i> Payment Details</h4>
-                            <p id="prevBankDetails" class="text-xs text-gray-600 leading-relaxed whitespace-pre-line font-mono"></p>
+                            <div id="bankDetailsSection" class="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200 hidden">
+                                <h4 class="text-[11px] font-bold text-gray-800 uppercase tracking-widest mb-2 flex items-center gap-1.5"><i class="fas fa-university text-gray-400"></i> Payment Details</h4>
+                                <p id="prevBankDetails" class="text-xs text-gray-600 leading-relaxed whitespace-pre-line font-mono"></p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -737,8 +744,8 @@
                 if(editorTotal) editorTotal.textContent = currency + formatMoney(rowTotal);
 
                 const tr = document.createElement('tr');
-                // Subtle zebra striping
-                if(index % 2 !== 0) tr.classList.add('bg-gray-50/50');
+                // Subtle zebra striping and prevent page break inside row
+                tr.className = 'avoid-break ' + (index % 2 !== 0 ? 'bg-gray-50/50' : '');
                 
                 tr.innerHTML = `
                     <td class="py-3.5 px-4 text-gray-800 font-medium">${item.desc || '<span class="text-gray-400 italic">Item description...</span>'}</td>
@@ -804,11 +811,12 @@
 
             // Config options
             const opt = {
-                margin:       0,
+                margin:       [10, 0, 10, 0], // Top, Right, Bottom, Left margins to prevent edge-slicing
                 filename:     filename,
                 image:        { type: 'jpeg', quality: 1 },
                 html2canvas:  { scale: 2, useCORS: true, logging: false },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: ['css', 'legacy'] }
             };
 
             // Execute
